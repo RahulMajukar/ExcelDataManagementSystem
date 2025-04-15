@@ -684,7 +684,7 @@ const Dashboard2 = () => {
 
       {/* Header */}
       <header className={`${isDarkMode ? 'bg-gray-800 shadow-gray-700' : 'bg-white shadow-gray-200'} shadow`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center">
             <FileSpreadsheet className={`h-6 w-6 mr-2 ${isDarkMode ? 'text-blue-400' : 'text-indigo-600'}`} />
             <h1 className="text-2xl font-bold">
@@ -828,7 +828,7 @@ const Dashboard2 = () => {
       </header>
       
       {/* Main content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      <main className="max-w-full mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-4 sm:px-0">
           {/* Status message */}
           {statusMessage.text && (

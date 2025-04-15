@@ -163,7 +163,7 @@ const ExcelListPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       {/* Header */}
       <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center">
             <div className="w-40 h-12 mr-4">
               <StateStreetLogo />
@@ -185,7 +185,7 @@ const ExcelListPage = () => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      <main className="max-w-full mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <div className="bg-white shadow-lg rounded-lg overflow-hidden">
           <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-blue-50">
             <h2 className="text-3xl font-bold text-gray-800">Select Excel File</h2>
