@@ -36,8 +36,8 @@ const LoginPage = () => {
       localStorage.setItem('isLoggedIn', 'true');
       localStorage.setItem('user', data.email);
       
-      // Redirect to dashboard using React Router
-      navigate('/dashboard');
+      // Redirect to excel list page instead of dashboard
+      navigate('/excel-list');
     } else {
       setError('root', { 
         type: 'manual',

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './components/LoginPage';
+import ExcelListPage from './components/ExcelListPage';
 import Dashboard from './components/Dashboard2';
 
 // Protected route component that checks for authentication
@@ -24,22 +25,31 @@ const App = () => {
         
         {/* Protected routes */}
         <Route 
+          path="/excel-list" 
+          element={
+            <ProtectedRoute>
+              <ExcelListPage />
+            </ProtectedRoute>
+          }
+        />
+        
+        <Route 
           path="/dashboard" 
           element={
             <ProtectedRoute>
               <Dashboard />
             </ProtectedRoute>
-          } 
+          }
         />
         
-        {/* Default route - redirect to dashboard if logged in, otherwise to login */}
+        {/* Default route - redirect to excel list if logged in, otherwise to login */}
         <Route 
           path="*" 
           element={
             localStorage.getItem('isLoggedIn') === 'true' ? 
-              <Navigate to="/dashboard" /> : 
+              <Navigate to="/excel-list" /> : 
               <Navigate to="/login" />
-          } 
+          }
         />
       </Routes>
     </Router>
