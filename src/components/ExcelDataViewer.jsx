@@ -11,10 +11,14 @@ import {
   Download,
   RefreshCw,
   ArrowLeft,
-  BarChart,
   Database,
-  Settings,
-  X
+  X,
+  Edit2,
+  Trash2,
+  PlusCircle,
+  Save,
+  CheckCircle,
+  Layers
 } from 'lucide-react';
 
 const StateStreetLogo = () => (
@@ -49,6 +53,20 @@ const ExcelDataViewer = () => {
   const [filters, setFilters] = useState({});
   const [fileInfo, setFileInfo] = useState(null);
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+
+  // Edit mode states
+  const [editMode, setEditMode] = useState(false);
+  const [editingRowIndex, setEditingRowIndex] = useState(null);
+  const [editRowData, setEditRowData] = useState({});
+  
+  // Add row state
+  const [isAddingRow, setIsAddingRow] = useState(false);
+  const [newRowData, setNewRowData] = useState({});
+  
+  // Sheet switching
+  const [availableSheets, setAvailableSheets] = useState([]);
+  const [sheetSelectorOpen, setSheetSelectorOpen] = useState(false);
 
   // Fetch data on initial load and when pagination/filtering changes
   useEffect(() => {
@@ -71,6 +89,15 @@ const ExcelDataViewer = () => {
       });
       
       setTableData(response.data);
+      
+      // Initialize new row data structure based on columns
+      if (response.data.columns && response.data.columns.length > 0) {
+        const initialNewRow = {};
+        response.data.columns.forEach(col => {
+          initialNewRow[col.name] = '';
+        });
+        setNewRowData(initialNewRow);
+      }
     } catch (err) {
       console.error('Error fetching table data:', err);
       setError(err.response?.data?.message || 'Error loading table data');
@@ -83,10 +110,32 @@ const ExcelDataViewer = () => {
     try {
       const response = await axios.get(`http://localhost:8080/api/excel/mapping/${tableName}`);
       setFileInfo(response.data);
+      
+      // After getting fileInfo, fetch all sheets for this file
+      if (response.data.excelFile) {
+        fetchAvailableSheets(response.data.excelFile.id);
+      }
     } catch (err) {
       console.error('Error fetching file info:', err);
       // Non-critical error, so we don't set the main error state
     }
+  };
+
+  const fetchAvailableSheets = async (fileId) => {
+    try {
+      const response = await axios.get(`http://localhost:8080/api/excel/files/${fileId}`);
+      if (response.data && response.data.sheetMappings) {
+        setAvailableSheets(response.data.sheetMappings);
+      }
+    } catch (err) {
+      console.error('Error fetching sheets:', err);
+    }
+  };
+
+  const handleSwitchSheet = (newTableName) => {
+    // Navigate to the selected table
+    navigate(`/view/${newTableName}`);
+    setSheetSelectorOpen(false);
   };
 
   const handlePageChange = (newPage) => {
@@ -164,6 +213,131 @@ const ExcelDataViewer = () => {
     navigate('/');
   };
 
+  // Edit row functions
+  const startEditRow = (rowIndex) => {
+    setEditMode(true);
+    setEditingRowIndex(rowIndex);
+    setEditRowData({...tableData.data[rowIndex]});
+    setIsAddingRow(false);
+  };
+
+  const cancelEdit = () => {
+    setEditMode(false);
+    setEditingRowIndex(null);
+    setEditRowData({});
+  };
+
+  const handleEditInputChange = (columnName, value) => {
+    setEditRowData({
+      ...editRowData,
+      [columnName]: value
+    });
+  };
+
+  const saveEditedRow = async () => {
+    try {
+      // Call API to update the row
+      const response = await axios.put(`http://localhost:8080/api/excel/table/${tableName}/rows/${editRowData.id}`, editRowData);
+      
+      // Update local state
+      const updatedData = [...tableData.data];
+      updatedData[editingRowIndex] = editRowData;
+      setTableData({
+        ...tableData,
+        data: updatedData
+      });
+      
+      // Exit edit mode
+      setEditMode(false);
+      setEditingRowIndex(null);
+      setEditRowData({});
+      
+      // Show success message
+      setSuccessMessage('Row updated successfully');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      console.error('Error updating row:', err);
+      setError(err.response?.data?.message || 'Error updating row');
+    }
+  };
+
+  // Add row functions
+  const startAddRow = () => {
+    setIsAddingRow(true);
+    setEditMode(false);
+    setEditingRowIndex(null);
+    
+    // Reset new row data
+    const initialNewRow = {};
+    tableData.columns.forEach(col => {
+      initialNewRow[col.name] = '';
+    });
+    setNewRowData(initialNewRow);
+  };
+
+  const cancelAddRow = () => {
+    setIsAddingRow(false);
+    setNewRowData({});
+  };
+
+  const handleNewRowInputChange = (columnName, value) => {
+    setNewRowData({
+      ...newRowData,
+      [columnName]: value
+    });
+  };
+
+  const saveNewRow = async () => {
+    try {
+      // Call API to add the row
+      const response = await axios.post(`http://localhost:8080/api/excel/table/${tableName}/rows`, newRowData);
+      
+      // Update local state
+      const updatedData = [...tableData.data, response.data];
+      setTableData({
+        ...tableData,
+        data: updatedData,
+        totalRows: tableData.totalRows + 1
+      });
+      
+      // Exit add mode
+      setIsAddingRow(false);
+      setNewRowData({});
+      
+      // Show success message
+      setSuccessMessage('Row added successfully');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      console.error('Error adding row:', err);
+      setError(err.response?.data?.message || 'Error adding row');
+    }
+  };
+
+  // Delete row function
+  const deleteRow = async (rowIndex, rowId) => {
+    if (window.confirm('Are you sure you want to delete this row? This action cannot be undone.')) {
+      try {
+        // Call API to delete the row
+        await axios.delete(`http://localhost:8080/api/excel/table/${tableName}/rows/${rowId}`);
+        
+        // Update local state
+        const updatedData = tableData.data.filter((_, index) => index !== rowIndex);
+        setTableData({
+          ...tableData,
+          data: updatedData,
+          totalRows: tableData.totalRows - 1
+        });
+        
+        // Show success message
+        setSuccessMessage('Row deleted successfully');
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } catch (err) {
+        console.error('Error deleting row:', err);
+        setError(err.response?.data?.message || 'Error deleting row');
+      }
+    }
+  };
+
   // Pagination helpers
   const totalPages = Math.ceil(tableData.totalRows / pageSize);
   
@@ -210,26 +384,75 @@ const ExcelDataViewer = () => {
           {/* Table header */}
           <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-blue-50">
             <div className="flex flex-wrap justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800">
-                  {tableData.table || tableName}
-                </h2>
-                {fileInfo && (
-                  <p className="mt-1 text-sm text-gray-600">
-                    From Excel file: <span className="font-medium">{fileInfo.excelFile?.originalFilename}</span>
-                    {fileInfo.sheetName && (
-                      <>, Sheet: <span className="font-medium">{fileInfo.sheetName}</span></>
-                    )}
+              <div className="flex items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">
+                    {tableData.table || tableName}
+                  </h2>
+                  {fileInfo && (
+                    <p className="mt-1 text-sm text-gray-600">
+                      From Excel file: <span className="font-medium">{fileInfo.excelFile?.originalFilename}</span>
+                      {fileInfo.sheetName && (
+                        <>, Sheet: <span className="font-medium">{fileInfo.sheetName}</span></>
+                      )}
+                    </p>
+                  )}
+                  <p className="mt-1 text-sm text-gray-500">
+                    {tableData.totalRows > 0 ? 
+                      `Showing ${tableData.data?.length || 0} of ${tableData.totalRows} rows` : 
+                      'No data available'}
                   </p>
+                </div>
+                
+                {/* Sheet selector dropdown */}
+                {availableSheets.length > 1 && (
+                  <div className="ml-6 relative">
+                    <button
+                      type="button"
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      onClick={() => setSheetSelectorOpen(!sheetSelectorOpen)}
+                    >
+                      <Layers className="h-4 w-4 mr-2" />
+                      Switch Sheet
+                      <ChevronDown className="h-4 w-4 ml-2" />
+                    </button>
+                    
+                    {sheetSelectorOpen && (
+                      <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                        <div className="py-1" role="menu" aria-orientation="vertical">
+                          {availableSheets.map(sheet => (
+                            <button
+                              key={sheet.id}
+                              className={`block w-full text-left px-4 py-2 text-sm ${
+                                sheet.tableName === tableName 
+                                  ? 'bg-indigo-100 text-indigo-900 font-medium' 
+                                  : 'text-gray-700 hover:bg-gray-100'
+                              }`}
+                              onClick={() => handleSwitchSheet(sheet.tableName)}
+                            >
+                              {sheet.sheetName}
+                              {sheet.tableName === tableName && (
+                                <CheckCircle className="h-4 w-4 ml-2 inline-block text-indigo-600" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
-                <p className="mt-1 text-sm text-gray-500">
-                  {tableData.totalRows > 0 ? 
-                    `Showing ${tableData.data?.length || 0} of ${tableData.totalRows} rows` : 
-                    'No data available'}
-                </p>
               </div>
               
-              <div className="mt-4 sm:mt-0 flex space-x-2">
+              <div className="mt-4 sm:mt-0 flex flex-wrap space-x-2">
+                <button
+                  onClick={startAddRow}
+                  className="inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  disabled={isAddingRow || editMode}
+                >
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Add Row
+                </button>
+                
                 <button
                   onClick={exportToCSV}
                   className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -301,6 +524,32 @@ const ExcelDataViewer = () => {
             </div>
           </div>
           
+          {/* Success message */}
+          {successMessage && (
+            <div className="bg-green-50 p-4 border-b border-green-200">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <CheckCircle className="h-5 w-5 text-green-400" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-green-800">{successMessage}</p>
+                </div>
+                <div className="ml-auto pl-3">
+                  <div className="-mx-1.5 -my-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSuccessMessage(null)}
+                      className="inline-flex bg-green-50 rounded-md p-1.5 text-green-500 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    >
+                      <span className="sr-only">Dismiss</span>
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* Error message */}
           {error && (
             <div className="bg-red-50 p-4 border-b border-red-200">
@@ -321,9 +570,7 @@ const ExcelDataViewer = () => {
                       className="inline-flex bg-red-50 rounded-md p-1.5 text-red-500 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                     >
                       <span className="sr-only">Dismiss</span>
-                      <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
+                      <X className="h-5 w-5" />
                     </button>
                   </div>
                 </div>
@@ -380,6 +627,53 @@ const ExcelDataViewer = () => {
             </div>
           )}
 
+          {/* Add New Row Form */}
+          {isAddingRow && (
+            <div className="bg-green-50 p-4 border-b border-green-200">
+              <div className="flex justify-between mb-4">
+                <h3 className="text-sm font-medium text-green-800">Add New Row</h3>
+                <button
+                  onClick={cancelAddRow}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {tableData.columns && tableData.columns.map(column => (
+                  <div key={column.name}>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {column.name}
+                    </label>
+                    <input
+                      type="text"
+                      value={newRowData[column.name] || ''}
+                      onChange={(e) => handleNewRowInputChange(column.name, e.target.value)}
+                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      placeholder={`Enter ${column.name}...`}
+                    />
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={cancelAddRow}
+                  className="mr-2 inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveNewRow}
+                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Table content */}
           {loading ? (
             <div className="py-12 flex justify-center">
@@ -390,6 +684,9 @@ const ExcelDataViewer = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                     {tableData.columns && tableData.columns.map(column => (
                       <th
                         key={column.name}
@@ -422,17 +719,62 @@ const ExcelDataViewer = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {tableData.data.map((row, rowIndex) => (
                     <tr key={rowIndex} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 whitespace-nowrap">
+                        <div className="flex items-center space-x-2">
+                          <button 
+                            onClick={() => startEditRow(rowIndex)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                            disabled={editMode || isAddingRow}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button 
+                            onClick={() => deleteRow(rowIndex, row.id)}
+                            className="text-red-600 hover:text-red-900"
+                            disabled={editMode || isAddingRow}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
                       {tableData.columns && tableData.columns.map(column => (
                         <td key={`${rowIndex}-${column.name}`} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {row[column.name] !== null && row[column.name] !== undefined 
-                            ? String(row[column.name]) 
-                            : ''}
+                          {editMode && editingRowIndex === rowIndex ? (
+                            <input
+                              type="text"
+                              value={editRowData[column.name] || ''}
+                              onChange={(e) => handleEditInputChange(column.name, e.target.value)}
+                              className="block w-full border border-gray-300 rounded-md shadow-sm py-1 px-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            />
+                          ) : (
+                            row[column.name] !== null && row[column.name] !== undefined 
+                              ? String(row[column.name]) 
+                              : ''
+                          )}
                         </td>
                       ))}
                     </tr>
                   ))}
                 </tbody>
               </table>
+
+              {/* Edit mode action buttons */}
+              {editMode && (
+                <div className="bg-indigo-50 p-4 border-t border-indigo-200 flex justify-end">
+                  <button 
+                    onClick={cancelEdit}
+                    className="mr-2 inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={saveEditedRow}
+                    className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="py-12 px-4 text-center">
@@ -443,6 +785,17 @@ const ExcelDataViewer = () => {
                   'Try adjusting your search or filters.' : 
                   'This table does not contain any data.'}
               </p>
+              {!searchTerm && Object.keys(filters).length === 0 && (
+                <div className="mt-5">
+                  <button
+                    onClick={startAddRow}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Add First Row
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
